@@ -7,7 +7,7 @@ env:
   REPO_URL: https://github.com/LiBwrt/LibWrt.git
   REPO_BRANCH: 25.12-nss
 
-  CONFIG_FILE: configs/ipq60xx-6.12-nowifi.config
+  CONFIG_FILE: configs/zn-m2-nikki.config
   DIY_SCRIPT: diy-script.sh
 
   CACHE_TOOLCHAIN: true
