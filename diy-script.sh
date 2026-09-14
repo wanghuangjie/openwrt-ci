@@ -147,3 +147,11 @@ echo " Nikki + Mihomo"
 echo " WireGuard"
 echo " Mosquitto"
 echo "============================================"
+
+
+# Mihomo core only: remove alpha package and its conflict declaration
+rm -rf package/feeds/nikki/mihomo-alpha
+if [ -f package/feeds/nikki/mihomo-meta/Makefile ]; then
+    sed -i '/^[[:space:]]*CONFLICTS:=mihomo-alpha[[:space:]]*$/d' package/feeds/nikki/mihomo-meta/Makefile
+    fi
+    
