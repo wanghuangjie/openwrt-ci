@@ -25,6 +25,10 @@ fi
 cp "$config_backup" .config
 rm -f "$config_backup"
 
+# Normalize only after all feed package links exist, so selected packages are
+# retained while OpenWrt accepts the configuration for subsequent targets.
+make defconfig
+
 printf '%s\n' \
   'Nikki feed ready; base feeds installed; stable Mihomo meta provider selected.' \
   'ZN M2 / Kernel 6.12 / NSS / No WiFi / No USB / Nikki'
