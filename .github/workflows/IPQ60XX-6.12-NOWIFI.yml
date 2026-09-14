@@ -56,7 +56,6 @@ jobs:
           grep -E '^(CONFIG_PACKAGE_(mihomo|nikki|luci-app-nikki|luci-i18n-nikki))' .config || true
           echo "=== feed links ==="
           ls -la package/feeds/nikki 2>/dev/null || true
-          make defconfig
           echo "=== Nikki feed packages ==="
           find package/feeds/nikki -maxdepth 2 -type f -name Makefile -print 2>/dev/null | sort || true
           echo "=== target and proxy config ==="

@@ -17,8 +17,6 @@ if [ -f package/feeds/nikki/mihomo-meta/Makefile ]; then
     sed -i '/^[[:space:]]*CONFLICTS:=mihomo-alpha[[:space:]]*$/d' package/feeds/nikki/mihomo-meta/Makefile
 fi
 
-# Generate the final Kconfig after the provider set is fixed.
-make defconfig
 printf '%s\n' \
   'Nikki feed ready; base feeds installed; stable Mihomo meta provider selected.' \
   'ZN M2 / Kernel 6.12 / NSS / No WiFi / No USB / Nikki'
