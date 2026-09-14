@@ -53,6 +53,10 @@ jobs:
         run: |
           cd openwrt
           make defconfig
+          echo "=== Nikki feed packages ==="
+          find package/feeds/nikki -maxdepth 2 -type f -name Makefile -print 2>/dev/null | sort || true
+          echo "=== target and proxy config ==="
+          grep -E '^(CONFIG_TARGET_PROFILE|CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_zn_m2|CONFIG_PACKAGE_(mihomo|nikki|luci-app-nikki|luci-i18n-nikki))' .config || true
           grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config
           grep -qx 'CONFIG_PACKAGE_mihomo-meta=y' .config
           grep -qx 'CONFIG_PACKAGE_nikki=y' .config
