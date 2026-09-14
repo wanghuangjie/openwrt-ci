@@ -63,6 +63,11 @@ echo "Installing feeds..."
 
 ./scripts/feeds install -a
 
+# Nikki 同时提供 mihomo-meta 和 mihomo-alpha；两者互相 CONFLICTS，
+# 在部分 OpenWrt Kconfig 版本中会被展开成递归依赖。此固件固定使用
+# stable 的 mihomo-meta，因此在生成 .config 前移除 alpha 包入口。
+rm -rf package/feeds/nikki/mihomo-alpha
+
 
 # ============================================================
 # 6. Lucky
