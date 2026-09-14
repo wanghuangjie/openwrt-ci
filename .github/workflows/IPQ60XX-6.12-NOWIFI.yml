@@ -54,7 +54,11 @@ jobs:
           cd openwrt
           make defconfig
           grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config
-          ! grep -Eq '^CONFIG_PACKAGE_(mihomo-meta|mihomo-alpha|nikki|luci-app-nikki|luci-i18n-nikki-zh-cn)=y$' .config
+          grep -qx 'CONFIG_PACKAGE_mihomo-meta=y' .config
+          grep -qx 'CONFIG_PACKAGE_nikki=y' .config
+          grep -qx 'CONFIG_PACKAGE_luci-app-nikki=y' .config
+          grep -qx 'CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y' .config
+          ! grep -qx 'CONFIG_PACKAGE_mihomo-alpha=y' .config
           ! grep -Eq '^CONFIG_PACKAGE_(kmod-ath11k|ath11k-firmware-.*|wpad.*|hostapd.*|kmod-usb.*|usb-modeswitch|usbutils|usbmuxd)=y$' .config
           grep -E '^(CONFIG_TARGET_.*zn_m2|CONFIG_PACKAGE_kmod-qca-nss-(dp|drv|ecm))' .config || true
 
