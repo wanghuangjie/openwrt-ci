@@ -11,8 +11,8 @@ concurrency:
 env:
   REPO_URL: https://github.com/LiBwrt/LibWrt.git
   REPO_BRANCH: 25.12-nss
-  CONFIG_FILE: configs/zn-m2-nikki.config
-  DIY_SCRIPT: diy-script.sh
+  CONFIG_URL: https://raw.githubusercontent.com/wanghuangjie/openwrt-ci/main/configs/zn-m2-nikki.config
+  DIY_URL: https://raw.githubusercontent.com/wanghuangjie/openwrt-ci/main/diy-script.sh
   FIRMWARE_TAG: ZN-M2-6.12-NOWIFI
   TZ: Asia/Shanghai
 
@@ -43,10 +43,11 @@ jobs:
 
       - name: Load configuration
         run: |
-          cp "$GITHUB_WORKSPACE/$CONFIG_FILE" openwrt/.config
-          chmod +x "$GITHUB_WORKSPACE/$DIY_SCRIPT"
+          curl -fsSL "$CONFIG_URL" -o openwrt/.config
+          curl -fsSL "$DIY_URL" -o /tmp/zn-m2-diy.sh
+          chmod +x /tmp/zn-m2-diy.sh
           cd openwrt
-          "$GITHUB_WORKSPACE/$DIY_SCRIPT"
+          /tmp/zn-m2-diy.sh
 
       - name: Generate and validate final config
         run: |
