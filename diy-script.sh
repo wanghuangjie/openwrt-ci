@@ -13,6 +13,7 @@ find package/*/ -maxdepth 2 -path "*/Makefile" 2>/dev/null | xargs -r sed -i 's#
 
 echo "Compiling Nikki package..."
 make defconfig
+make tools/compile -j$(nproc)
 make package/luci-app-nikki/compile V=s
 
 echo "ZN M2 DIY configuration completed: Kernel 6.12 / NSS / No WiFi / No USB / Nikki"
