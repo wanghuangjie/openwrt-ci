@@ -1,463 +1,80 @@
-name: ZN-M2-6.12-NIKKI
+
+name: ZN-M2-6.12-MIHOMO
 
 on:
   workflow_dispatch:
 
 concurrency:
-  group: zn-m2-6.12-nikki
+  group: zn-m2-6.12-mihomo
   cancel-in-progress: false
 
 env:
   REPO_URL: https://github.com/LiBwrt/LibWrt.git
   REPO_BRANCH: 25.12-nss
-
   CONFIG_FILE: configs/zn-m2-nikki.config
   DIY_SCRIPT: diy-script.sh
-
-  CACHE_TOOLCHAIN: true
-  UPLOAD_BIN_DIR: false
-  FIRMWARE_RELEASE: true
-
-  FIRMWARE_TAG: ZN-M2-6.12-NIKKI
-
+  FIRMWARE_TAG: ZN-M2-6.12-MIHOMO
   TZ: Asia/Shanghai
 
-
 jobs:
-
   Build:
-
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
-
-
     steps:
-
-    # ========================================================
-    # 检查服务器
-    # ========================================================
-
-    - name: Check Server Performance
-      run: |
-        echo "---------------- CPU ----------------"
-        nproc
-        lscpu | grep "Model name" || true
-
-        echo "---------------- Memory -------------"
-        free -h
-
-        echo "---------------- Disk ---------------"
-        df -hT
-
-
-    # ========================================================
-    # 初始化编译环境
-    # ========================================================
-
-    - name: Initialization Environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
-
-      run: |
-
-        sudo bash -c \
-        'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-
-        sudo -E apt -yqq install \
-          dos2unix \
-          libfuse-dev
-
-        sudo timedatectl set-timezone "$TZ"
-
-
-    # ========================================================
-    # 扩大 GitHub Actions 编译空间
-    # ========================================================
-
-    - name: Combine Disks
-
-      uses: easimon/maximize-build-space@master
-
-      with:
-
-        swap-size-mb: 1024
-        temp-reserve-mb: 100
-        root-reserve-mb: 1024
-
-
-    # ========================================================
-    # Checkout 自己的 CI Repo
-    # ========================================================
-
-    - name: Checkout
-
-      uses: actions/checkout@main
-
-
-    # ========================================================
-    # Clone LiBwrt
-    # ========================================================
-
-    - name: Clone Source Code
-
-      run: |
-
-        df -hT $GITHUB_WORKSPACE
-
-        git clone \
-          --depth 1 \
-          -b $REPO_BRANCH \
-          $REPO_URL \
-          openwrt
-
-        cd openwrt
-
-        echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
-
-        VERSION_INFO=$(git show \
-          -s \
-          --date=short \
-          --format="作者: %an<br/>时间: %cd<br/>内容: %s<br/>hash: %H")
-
-        echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
-
-
-    # ========================================================
-    # 初次读取设备配置
-    # ========================================================
-
-    - name: Generate Variables
-
-      run: |
-
-        cp "$CONFIG_FILE" "$OPENWRT_PATH/.config"
-
-        cd "$OPENWRT_PATH"
-
-        make defconfig > /dev/null 2>&1
-
-        grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config || {
-          echo "ERROR: target profile is not ZN M2"
-          grep -E '^CONFIG_TARGET_(PROFILE|DEVICE)' .config || true
-          exit 1
-        }
-
-        SOURCE_REPO="$(basename "$REPO_URL" .git)"
-
-        echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
-
-        DEVICE_TARGET=$(grep CONFIG_TARGET_BOARD .config | \
-          awk -F '"' '{print $2}')
-
-        DEVICE_SUBTARGET=$(grep CONFIG_TARGET_SUBTARGET .config | \
-          awk -F '"' '{print $2}')
-
-        echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
-        echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
-
-
-    # ========================================================
-    # Cache
-    # ========================================================
-
-    - name: Cache Toolchain
-
-      if: env.CACHE_TOOLCHAIN == 'true'
-
-      uses: HiGarfield/cachewrtbuild@main
-
-      with:
-
-        ccache: false
-
-        mixkey: >
-          ${{ env.SOURCE_REPO }}-${{ env.REPO_BRANCH }}-${{
-          env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-
-        prefix: ${{ env.OPENWRT_PATH }}
-
-
-    # ========================================================
-    # 加载配置 + DIY
-    #
-    # diy-script.sh 内：
-    #
-    # 1. 添加 Nikki feed
-    # 2. feeds update
-    # 3. feeds install
-    #
-    # ========================================================
-
-    - name: Load Custom Configuration
-
-      run: |
-
-        if [ -e files ]; then
-          mv files "$OPENWRT_PATH/files"
-        fi
-
-        cp "$CONFIG_FILE" "$OPENWRT_PATH/.config"
-
-        chmod +x "$DIY_SCRIPT"
-
-        cd "$OPENWRT_PATH"
-
-        "$GITHUB_WORKSPACE/$DIY_SCRIPT"
-
-
-    # ========================================================
-    # 最终生成配置
-    # ========================================================
-
-    - name: Generate Final Config
-
-      run: |
-
-        cd "$OPENWRT_PATH"
-
-        make defconfig
-
-        set -euo pipefail
-
-        required_symbols=(
-          CONFIG_TARGET_qualcommax
-          CONFIG_TARGET_qualcommax_ipq60xx
-          CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_zn_m2
-          CONFIG_PACKAGE_kmod-qca-nss-dp
-          CONFIG_PACKAGE_kmod-qca-nss-drv
-          CONFIG_PACKAGE_kmod-qca-nss-ecm
-          CONFIG_PACKAGE_nikki
-          CONFIG_PACKAGE_luci-app-nikki
-          CONFIG_PACKAGE_luci-i18n-nikki-zh-cn
-          CONFIG_PACKAGE_mihomo-meta
-          CONFIG_PACKAGE_kmod-wireguard
-          CONFIG_PACKAGE_wireguard-tools
-          CONFIG_PACKAGE_luci-proto-wireguard
-          CONFIG_PACKAGE_mosquitto-ssl
-          CONFIG_PACKAGE_mosquitto-client-ssl
-          CONFIG_PACKAGE_lucky
-          CONFIG_PACKAGE_luci-app-lucky
-          CONFIG_PACKAGE_luci-app-ddns
-          CONFIG_PACKAGE_ddns-scripts-cloudflare
-          CONFIG_PACKAGE_luci-app-upnp
-          CONFIG_PACKAGE_luci-app-wol
-          CONFIG_PACKAGE_luci-app-watchcat
-          CONFIG_PACKAGE_luci-app-ttyd
-        )
-
-        for symbol in "${required_symbols[@]}"; do
-          grep -qx "${symbol}=y" .config || {
-            echo "ERROR: required symbol is missing: ${symbol}=y"
-            exit 1
-          }
-        done
-
-        grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config || {
-          echo "ERROR: final target profile is not ZN M2"
-          exit 1
-        }
-
-        selected_devices=$(grep -Ec \
-          '^CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_.*=y$' \
-          .config)
-
-        if [ "$selected_devices" -ne 1 ]; then
-          echo "ERROR: expected exactly one IPQ60xx device, got $selected_devices"
-          grep -E '^CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_.*=y$' \
-            .config || true
-          exit 1
-        fi
-
-        forbidden_packages='^(CONFIG_PACKAGE_(kmod-ath11k(|-ahb|-pci)|ath11k-firmware-.*|wpad.*|hostapd.*|kmod-usb.*|usb-modeswitch|usbutils|usbmuxd|luci-app-homeproxy|luci-app-passwall|luci-app-passwall2|luci-app-sqm|sqm-scripts|coremark|kmod-mtd-rw))=y$'
-
-        if grep -Eq "$forbidden_packages" .config; then
-          echo "ERROR: Wi-Fi, USB, or an excluded package was enabled"
-          grep -E "$forbidden_packages" .config
-          exit 1
-        fi
-
-        echo "================ ZN M2 ================="
-
-        grep "CONFIG_TARGET.*zn_m2" .config || true
-
-        echo "================ Nikki ================="
-
-        grep -E \
-        "CONFIG_PACKAGE_(nikki|luci-app-nikki|mihomo-meta)=" \
-        .config || true
-
-        echo "=============== WireGuard ==============="
-
-        grep -E \
-        "CONFIG_PACKAGE_(kmod-wireguard|wireguard-tools|luci-proto-wireguard)" \
-        .config || true
-
-        echo "=============== Mosquitto ==============="
-
-        grep -E \
-        "CONFIG_PACKAGE_(mosquitto-ssl|mosquitto-client-ssl)=" \
-        .config || true
-
-
-    # ========================================================
-    # 下载源码包
-    # ========================================================
-
-    - name: Download DL Package
-
-      run: |
-
-        cd "$OPENWRT_PATH"
-
-        make download -j8
-
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
-
-
-    # ========================================================
-    # 编译
-    # ========================================================
-
-    - name: Compile Firmware
-
-      id: compile
-
-      run: |
-
-        cd "$OPENWRT_PATH"
-
-        echo "$(nproc) thread compile"
-
-        make -j$(nproc) || \
-        make -j1 || \
-        make -j1 V=s
-
-        echo "status=success" >> $GITHUB_OUTPUT
-
-        echo "DATE=$(date +"%Y-%m-%d %H:%M:%S")" \
-          >> $GITHUB_ENV
-
-        echo "FILE_DATE=$(date +"%Y.%m.%d")" \
-          >> $GITHUB_ENV
-
-
-    # ========================================================
-    # 空间
-    # ========================================================
-
-    - name: Check Space Usage
-
-      if: (!cancelled())
-
-      run: df -hT
-
-
-    # ========================================================
-    # 整理固件
-    # ========================================================
-
-    - name: Organize Files
-
-      if: steps.compile.outputs.status == 'success'
-
-      run: |
-
-        set -euo pipefail
-
-        target_dir="$OPENWRT_PATH/bin/targets/qualcommax/ipq60xx"
-        release_dir="$GITHUB_WORKSPACE/release-zn-m2"
-
-        factory=("$target_dir"/*-zn_m2-squashfs-factory.ubi)
-        sysupgrade=("$target_dir"/*-zn_m2-squashfs-sysupgrade.bin)
-
-        if [ "${#factory[@]}" -ne 1 ] || [ ! -f "${factory[0]}" ]; then
-          echo "ERROR: expected exactly one ZN M2 factory image"
-          find "$target_dir" -maxdepth 1 -type f -print
-          exit 1
-        fi
-
-        if [ "${#sysupgrade[@]}" -ne 1 ] || [ ! -f "${sysupgrade[0]}" ]; then
-          echo "ERROR: expected exactly one ZN M2 sysupgrade image"
-          find "$target_dir" -maxdepth 1 -type f -print
-          exit 1
-        fi
-
-        mkdir -p "$release_dir"
-        cp "${factory[0]}" "${sysupgrade[0]}" "$release_dir/"
-        cp "$OPENWRT_PATH/.config" "$release_dir/build.config"
-
-        cd "$release_dir"
-        sha256sum ./* > sha256sums
-        cat sha256sums
-
-        echo "FIRMWARE_PATH=$release_dir" >> $GITHUB_ENV
-
-
-    # ========================================================
-    # Release
-    # ========================================================
-
-    - name: Upload Firmware To Release
-
-      if: >
-        steps.compile.outputs.status == 'success' &&
-        env.FIRMWARE_RELEASE == 'true'
-
-      uses: ncipollo/release-action@v1
-
-      with:
-
-        name: R${{ env.DATE }} for ZN-M2
-
-        allowUpdates: true
-
-        removeArtifacts: true
-
-        replacesArtifacts: true
-
-        tag: ${{ env.FIRMWARE_TAG }}
-
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-        artifacts: ${{ env.FIRMWARE_PATH }}/*
-
-        body: |
-
-          # ZN M2 OpenWrt
-
-          **Target**
-          - ZN M2
-          - Qualcomm IPQ60xx
-
-          **System**
-          - LiBwrt
-          - Kernel 6.12
-          - NSS
-          - No WiFi
-          - No USB
-
-          **Proxy**
-          - Nikki
-          - Mihomo
-
-          **VPN**
-          - WireGuard
-
-          **Services**
-          - Mosquitto
-          - Lucky
-          - DDNS
-          - UPnP
-          - WOL
-          - TTYD
-
-          **Network**
-          - firewall4 / nftables
-          - dnsmasq-full
-          - PPPoE
-
-          Default IP:
-          192.168.1.1
+      - name: Checkout CI repository
+        uses: actions/checkout@v4
+
+      - name: Prepare build space
+        uses: easimon/maximize-build-space@master
+        with:
+          swap-size-mb: 1024
+          temp-reserve-mb: 100
+          root-reserve-mb: 1024
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dos2unix libfuse-dev
+          sudo timedatectl set-timezone "$TZ"
+
+      - name: Clone LiBwrt source
+        run: |
+          git clone --depth 1 -b "$REPO_BRANCH" "$REPO_URL" openwrt
+
+      - name: Load configuration and Mihomo feed
+        run: |
+          cp "$CONFIG_FILE" openwrt/.config
+          chmod +x "$DIY_SCRIPT"
+          cd openwrt
+          "$GITHUB_WORKSPACE/$DIY_SCRIPT"
+
+      - name: Generate and validate final config
+        run: |
+          cd openwrt
+          make defconfig
+          grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config
+          grep -qx 'CONFIG_PACKAGE_mihomo-meta=y' .config
+          ! grep -Eq '^CONFIG_PACKAGE_(nikki|luci-app-nikki|luci-i18n-nikki-zh-cn)=y$' .config
+          ! grep -Eq '^CONFIG_PACKAGE_(kmod-ath11k|ath11k-firmware-|wpad|hostapd|kmod-usb|usb-modeswitch|usbutils|usbmuxd)=y$' .config
+          grep -E '^(CONFIG_TARGET_.*zn_m2|CONFIG_PACKAGE_mihomo-meta|CONFIG_PACKAGE_kmod-qca-nss-(dp|drv|ecm))' .config || true
+
+      - name: Download packages
+        run: |
+          cd openwrt
+          make download -j8
+
+      - name: Compile firmware
+        run: |
+          cd openwrt
+          make -j$(nproc) || make -j1 V=s
+
+      - name: Upload firmware artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZN-M2-6.12-MIHOMO
+          path: |
+            openwrt/bin/targets/qualcommax/ipq60xx/*zn_m2*
+            openwrt/.config
+          if-no-files-found: warn
