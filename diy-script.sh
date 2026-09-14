@@ -3,6 +3,9 @@ set -e
 
 # Add Nikki's feed, then install the normal base feeds so all package dependencies exist.
 grep -q '^src-git nikki ' feeds.conf.default || echo 'src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main' >> feeds.conf.default
+config_backup=$(mktemp)
+cp .config "$config_backup"
+
 ./scripts/feeds update -a
 
 # Remove the conflicting alpha provider before feed installation so it never
@@ -16,6 +19,11 @@ rm -rf feeds/nikki/mihomo-alpha package/feeds/nikki/mihomo-alpha
 if [ -f package/feeds/nikki/mihomo-meta/Makefile ]; then
     sed -i '/^[[:space:]]*CONFLICTS:=mihomo-alpha[[:space:]]*$/d' package/feeds/nikki/mihomo-meta/Makefile
 fi
+
+# feeds update refreshes Kconfig before feed links exist and would drop all
+# third-party selections. Restore the user's complete configuration now.
+cp "$config_backup" .config
+rm -f "$config_backup"
 
 printf '%s\n' \
   'Nikki feed ready; base feeds installed; stable Mihomo meta provider selected.' \
