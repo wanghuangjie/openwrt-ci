@@ -3,6 +3,10 @@ name: ZN-M2-6.12-NIKKI
 on:
   workflow_dispatch:
 
+concurrency:
+  group: zn-m2-6.12-nikki
+  cancel-in-progress: false
+
 env:
   REPO_URL: https://github.com/LiBwrt/LibWrt.git
   REPO_BRANCH: 25.12-nss
@@ -134,6 +138,12 @@ jobs:
 
         make defconfig > /dev/null 2>&1
 
+        grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config || {
+          echo "ERROR: target profile is not ZN M2"
+          grep -E '^CONFIG_TARGET_(PROFILE|DEVICE)' .config || true
+          exit 1
+        }
+
         SOURCE_REPO="$(basename "$REPO_URL" .git)"
 
         echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
@@ -209,6 +219,65 @@ jobs:
 
         make defconfig
 
+        set -euo pipefail
+
+        required_symbols=(
+          CONFIG_TARGET_qualcommax
+          CONFIG_TARGET_qualcommax_ipq60xx
+          CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_zn_m2
+          CONFIG_PACKAGE_kmod-qca-nss-dp
+          CONFIG_PACKAGE_kmod-qca-nss-drv
+          CONFIG_PACKAGE_kmod-qca-nss-ecm
+          CONFIG_PACKAGE_nikki
+          CONFIG_PACKAGE_luci-app-nikki
+          CONFIG_PACKAGE_luci-i18n-nikki-zh-cn
+          CONFIG_PACKAGE_mihomo-meta
+          CONFIG_PACKAGE_kmod-wireguard
+          CONFIG_PACKAGE_wireguard-tools
+          CONFIG_PACKAGE_luci-proto-wireguard
+          CONFIG_PACKAGE_mosquitto-ssl
+          CONFIG_PACKAGE_mosquitto-client-ssl
+          CONFIG_PACKAGE_lucky
+          CONFIG_PACKAGE_luci-app-lucky
+          CONFIG_PACKAGE_luci-app-ddns
+          CONFIG_PACKAGE_ddns-scripts-cloudflare
+          CONFIG_PACKAGE_luci-app-upnp
+          CONFIG_PACKAGE_luci-app-wol
+          CONFIG_PACKAGE_luci-app-watchcat
+          CONFIG_PACKAGE_luci-app-ttyd
+        )
+
+        for symbol in "${required_symbols[@]}"; do
+          grep -qx "${symbol}=y" .config || {
+            echo "ERROR: required symbol is missing: ${symbol}=y"
+            exit 1
+          }
+        done
+
+        grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config || {
+          echo "ERROR: final target profile is not ZN M2"
+          exit 1
+        }
+
+        selected_devices=$(grep -Ec \
+          '^CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_.*=y$' \
+          .config)
+
+        if [ "$selected_devices" -ne 1 ]; then
+          echo "ERROR: expected exactly one IPQ60xx device, got $selected_devices"
+          grep -E '^CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_.*=y$' \
+            .config || true
+          exit 1
+        fi
+
+        forbidden_packages='^(CONFIG_PACKAGE_(kmod-ath11k(|-ahb|-pci)|ath11k-firmware-.*|wpad.*|hostapd.*|kmod-usb.*|usb-modeswitch|usbutils|usbmuxd|luci-app-homeproxy|luci-app-passwall|luci-app-passwall2|luci-app-sqm|sqm-scripts|coremark|kmod-mtd-rw))=y$'
+
+        if grep -Eq "$forbidden_packages" .config; then
+          echo "ERROR: Wi-Fi, USB, or an excluded package was enabled"
+          grep -E "$forbidden_packages" .config
+          exit 1
+        fi
+
         echo "================ ZN M2 ================="
 
         grep "CONFIG_TARGET.*zn_m2" .config || true
@@ -216,7 +285,7 @@ jobs:
         echo "================ Nikki ================="
 
         grep -E \
-        "CONFIG_PACKAGE_(nikki|luci-app-nikki|mihomo-meta)" \
+        "CONFIG_PACKAGE_(nikki|luci-app-nikki|mihomo-meta)=" \
         .config || true
 
         echo "=============== WireGuard ==============="
@@ -228,7 +297,7 @@ jobs:
         echo "=============== Mosquitto ==============="
 
         grep -E \
-        "CONFIG_PACKAGE_(mosquitto|mosquitto-client)" \
+        "CONFIG_PACKAGE_(mosquitto-ssl|mosquitto-client-ssl)=" \
         .config || true
 
 
@@ -296,13 +365,35 @@ jobs:
 
       run: |
 
-        cd "$OPENWRT_PATH"/bin/targets/*/*
+        set -euo pipefail
 
+        target_dir="$OPENWRT_PATH/bin/targets/qualcommax/ipq60xx"
+        release_dir="$GITHUB_WORKSPACE/release-zn-m2"
+
+        factory=("$target_dir"/*-zn_m2-squashfs-factory.ubi)
+        sysupgrade=("$target_dir"/*-zn_m2-squashfs-sysupgrade.bin)
+
+        if [ "${#factory[@]}" -ne 1 ] || [ ! -f "${factory[0]}" ]; then
+          echo "ERROR: expected exactly one ZN M2 factory image"
+          find "$target_dir" -maxdepth 1 -type f -print
+          exit 1
+        fi
+
+        if [ "${#sysupgrade[@]}" -ne 1 ] || [ ! -f "${sysupgrade[0]}" ]; then
+          echo "ERROR: expected exactly one ZN M2 sysupgrade image"
+          find "$target_dir" -maxdepth 1 -type f -print
+          exit 1
+        fi
+
+        mkdir -p "$release_dir"
+        cp "${factory[0]}" "${sysupgrade[0]}" "$release_dir/"
+        cp "$OPENWRT_PATH/.config" "$release_dir/build.config"
+
+        cd "$release_dir"
+        sha256sum ./* > sha256sums
         cat sha256sums
 
-        cp "$OPENWRT_PATH/.config" build.config
-
-        echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
+        echo "FIRMWARE_PATH=$release_dir" >> $GITHUB_ENV
 
 
     # ========================================================
@@ -322,6 +413,10 @@ jobs:
         name: R${{ env.DATE }} for ZN-M2
 
         allowUpdates: true
+
+        removeArtifacts: true
+
+        replacesArtifacts: true
 
         tag: ${{ env.FIRMWARE_TAG }}
 
@@ -356,7 +451,7 @@ jobs:
           - Lucky
           - DDNS
           - UPnP
-          - WOL Plus
+          - WOL
           - TTYD
 
           **Network**
