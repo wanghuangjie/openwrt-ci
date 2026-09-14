@@ -1,11 +1,11 @@
 
-name: ZN-M2-6.12-MIHOMO
+name: ZN-M2-6.12-NOWIFI
 
 on:
   workflow_dispatch:
 
 concurrency:
-  group: zn-m2-6.12-mihomo
+  group: zn-m2-6.12-nowifi
   cancel-in-progress: false
 
 env:
@@ -13,7 +13,7 @@ env:
   REPO_BRANCH: 25.12-nss
   CONFIG_FILE: configs/zn-m2-nikki.config
   DIY_SCRIPT: diy-script.sh
-  FIRMWARE_TAG: ZN-M2-6.12-MIHOMO
+  FIRMWARE_TAG: ZN-M2-6.12-NOWIFI
   TZ: Asia/Shanghai
 
 jobs:
@@ -39,13 +39,12 @@ jobs:
           sudo timedatectl set-timezone "$TZ"
 
       - name: Clone LiBwrt source
-        run: |
-          git clone --depth 1 -b "$REPO_BRANCH" "$REPO_URL" openwrt
+        run: git clone --depth 1 -b "$REPO_BRANCH" "$REPO_URL" openwrt
 
-      - name: Load configuration and Mihomo feed
+      - name: Load configuration
         run: |
-          cp "$CONFIG_FILE" openwrt/.config
-          chmod +x "$DIY_SCRIPT"
+          cp "$GITHUB_WORKSPACE/$CONFIG_FILE" openwrt/.config
+          chmod +x "$GITHUB_WORKSPACE/$DIY_SCRIPT"
           cd openwrt
           "$GITHUB_WORKSPACE/$DIY_SCRIPT"
 
@@ -54,10 +53,9 @@ jobs:
           cd openwrt
           make defconfig
           grep -qx 'CONFIG_TARGET_PROFILE="DEVICE_zn_m2"' .config
-          grep -qx 'CONFIG_PACKAGE_mihomo-meta=y' .config
-          ! grep -Eq '^CONFIG_PACKAGE_(nikki|luci-app-nikki|luci-i18n-nikki-zh-cn)=y$' .config
-          ! grep -Eq '^CONFIG_PACKAGE_(kmod-ath11k|ath11k-firmware-|wpad|hostapd|kmod-usb|usb-modeswitch|usbutils|usbmuxd)=y$' .config
-          grep -E '^(CONFIG_TARGET_.*zn_m2|CONFIG_PACKAGE_mihomo-meta|CONFIG_PACKAGE_kmod-qca-nss-(dp|drv|ecm))' .config || true
+          ! grep -Eq '^CONFIG_PACKAGE_(mihomo-meta|mihomo-alpha|nikki|luci-app-nikki|luci-i18n-nikki-zh-cn)=y$' .config
+          ! grep -Eq '^CONFIG_PACKAGE_(kmod-ath11k|ath11k-firmware-.*|wpad.*|hostapd.*|kmod-usb.*|usb-modeswitch|usbutils|usbmuxd)=y$' .config
+          grep -E '^(CONFIG_TARGET_.*zn_m2|CONFIG_PACKAGE_kmod-qca-nss-(dp|drv|ecm))' .config || true
 
       - name: Download packages
         run: |
@@ -73,7 +71,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ZN-M2-6.12-MIHOMO
+          name: ZN-M2-6.12-NOWIFI
           path: |
             openwrt/bin/targets/qualcommax/ipq60xx/*zn_m2*
             openwrt/.config
