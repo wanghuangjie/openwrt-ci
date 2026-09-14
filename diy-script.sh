@@ -41,10 +41,9 @@ set -e
 
 echo "Adding Nikki feed..."
 
-if ! grep -q '^src-git nikki ' feeds.conf.default; then
-    echo 'src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main' \
-        >> feeds.conf.default
-fi
+sed -i '/^src-git nikki /d' feeds.conf.default
+echo 'src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git^3799926b147d7065ac98508f16951f8714e53659' \
+    >> feeds.conf.default
 
 
 # ============================================================
@@ -66,7 +65,22 @@ echo "Installing feeds..."
 
 
 # ============================================================
-# 6. 清理不需要的代理软件
+# 6. Lucky
+# ============================================================
+
+echo "Adding Lucky packages..."
+
+LUCKY_COMMIT='c1730565c6df4ab30d345cf73584f03f5cc7bc8f'
+rm -rf package/lucky
+git init package/lucky
+git -C package/lucky remote add origin \
+    https://github.com/gdy666/luci-app-lucky.git
+git -C package/lucky fetch --depth 1 origin "$LUCKY_COMMIT"
+git -C package/lucky checkout --detach FETCH_HEAD
+
+
+# ============================================================
+# 7. 清理不需要的代理软件
 #
 # 防止其他 feed / 默认配置把它们选进来。
 # 最终是否进入固件仍以 .config 为准。
@@ -79,7 +93,7 @@ rm -rf package/luci-app-ssr-plus 2>/dev/null || true
 
 
 # ============================================================
-# 7. 修正部分第三方 LuCI Makefile 路径
+# 8. 修正部分第三方 LuCI Makefile 路径
 #
 # Nikki 通常不需要，但保留这一兼容处理成本很低。
 # ============================================================
@@ -90,7 +104,7 @@ find package/*/ -maxdepth 2 -path "*/Makefile" 2>/dev/null | \
 
 
 # ============================================================
-# 8. 修改版本显示
+# 9. 修改版本显示
 #
 # 示例：
 # OpenWrt R26.09.13 ZN-M2
@@ -116,7 +130,7 @@ fi
 
 
 # ============================================================
-# 9. 完成
+# 10. 完成
 # ============================================================
 
 echo "============================================"
